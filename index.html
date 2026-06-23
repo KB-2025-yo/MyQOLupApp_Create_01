@@ -45,6 +45,24 @@
       font-size: 18px;
       font-weight: 600;
       letter-spacing: 0.03em;
+      flex: 1; /* h1が余白を埋めてボタンを右端に寄せる */
+    }
+
+    /* ページ切り替えボタン（ヘッダー右端） */
+    .header-nav-btn {
+      display: inline-block;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #1a1a2e;
+      background: rgba(255, 255, 255, 0.88);
+      border-radius: 20px;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .header-nav-btn:hover {
+      background: white;
     }
 
     /* =====================
@@ -405,6 +423,7 @@
   <header>
     <span style="font-size:22px;">📦</span>
     <h1>商品スキャンリスト</h1>
+    <a href="doujin-list.html" class="header-nav-btn">📚 同人誌モード</a>
   </header>
 
   <main>

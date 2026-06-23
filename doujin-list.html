@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>同人誌売却リスト</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue",
+                   "游ゴシック体", YuGothic, sans-serif;
+      background: #f0f0f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a1a2e;
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    header h1 { font-size: 18px; font-weight: 600; flex: 1; }
+
+    /* ページ切り替えボタン（ヘッダー右端） */
+    .header-nav-btn {
+      display: inline-block;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #1a1a2e;
+      background: rgba(255, 255, 255, 0.88);
+      border-radius: 20px;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .header-nav-btn:hover { background: white; }
+
+    main {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 20px 16px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #888;
+      letter-spacing: 0.08em;
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 5px;
+      margin-top: 12px;
+    }
+    label:first-of-type { margin-top: 0; }
+
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      padding: 11px 14px;
+      font-size: 16px;
+      border: 1.5px solid #ddd;
+      border-radius: 9px;
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: inherit;
+      color: #1a1a2e;
+    }
+    input:focus { border-color: #4361ee; }
+
+    .optional-badge {
+      font-size: 11px;
+      color: #aaa;
+      font-weight: 400;
+      margin-left: 4px;
+    }
+
+    .error-msg {
+      font-size: 12px;
+      color: #e63946;
+      margin-top: 5px;
+      display: none;
+    }
+
+    /* ボタン共通 */
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      font-weight: 600;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    button:active { transform: scale(0.98); }
+
+    .btn-add {
+      display: block;
+      width: 100%;
+      margin-top: 16px;
+      padding: 13px;
+      font-size: 15px;
+      background: #4361ee;
+      color: white;
+      border-radius: 10px;
+    }
+    .btn-add:hover { opacity: 0.88; }
+
+    .btn-export {
+      display: block;
+      width: 100%;
+      margin-top: 14px;
+      padding: 12px;
+      font-size: 14px;
+      background: #2ec4b6;
+      color: white;
+      border-radius: 10px;
+    }
+    .btn-export:hover { opacity: 0.88; }
+
+    .btn-clear {
+      display: block;
+      width: 100%;
+      margin-top: 8px;
+      padding: 11px;
+      font-size: 13px;
+      background: none;
+      color: #e63946;
+      border: 1.5px solid #e63946;
+      border-radius: 10px;
+    }
+    .btn-clear:hover { background: #fff0f0; }
+
+    /* リスト */
+    .item-count {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 12px;
+    }
+
+    .item-list {
+      max-height: 420px;
+      overflow-y: auto;
+    }
+
+    .item-row {
+      display: flex;
+      align-items: flex-start;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+      gap: 10px;
+    }
+    .item-row:last-child { border-bottom: none; }
+
+    .item-index {
+      font-size: 11px;
+      color: #bbb;
+      min-width: 22px;
+      text-align: right;
+      padding-top: 2px;
+    }
+
+    .item-text { flex: 1; }
+
+    .item-title {
+      font-size: 14px;
+      color: #1a1a2e;
+      word-break: break-all;
+      line-height: 1.4;
+    }
+
+    .item-circle {
+      font-size: 11px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    .item-qty {
+      font-size: 12px;
+      font-weight: 600;
+      background: #f0f2ff;
+      color: #4361ee;
+      padding: 3px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+      margin-top: 2px;
+    }
+
+    .btn-delete {
+      background: none;
+      color: #ccc;
+      font-size: 16px;
+      padding: 4px 6px;
+      border-radius: 6px;
+    }
+    .btn-delete:hover { color: #e63946; background: #fff0f0; }
+
+    .empty-state {
+      text-align: center;
+      padding: 30px 0;
+      color: #bbb;
+      font-size: 14px;
+    }
+    .empty-state .icon { font-size: 36px; margin-bottom: 8px; }
+
+    #action-area { display: none; }
+  </style>
+</head>
+
+<body>
+  <header>
+    <span style="font-size:22px;">📚</span>
+    <h1>同人誌売却リスト</h1>
+    <a href="scan-list.html" class="header-nav-btn">📦 バーコードモード</a>
+  </header>
+
+  <main>
+
+    <!-- 入力カード -->
+    <div class="card">
+      <div class="card-title">商品を追加</div>
+
+      <label for="title-input">
+        タイトル
+        <span class="optional-badge">（駿河屋の検索に使います）</span>
+      </label>
+      <input
+        type="text"
+        id="title-input"
+        placeholder="例：夏の記憶　完全版"
+        autocomplete="off"
+      >
+      <div class="error-msg" id="error-title">タイトルを入力してください</div>
+
+      <label for="circle-input">
+        サークル名
+        <span class="optional-badge">（任意・検索補助に使います）</span>
+      </label>
+      <input
+        type="text"
+        id="circle-input"
+        placeholder="例：コアデ"
+        autocomplete="off"
+      >
+
+      <label for="qty-input">個数</label>
+      <input type="number" id="qty-input" value="1" min="1" max="999">
+
+      <button class="btn-add" onclick="addItem()">＋ リストに追加する</button>
+    </div>
+
+    <!-- リストカード -->
+    <div class="card">
+      <div class="card-title">登録リスト</div>
+      <div class="item-count" id="item-count">0件</div>
+
+      <div class="item-list" id="item-list">
+        <div class="empty-state" id="empty-state">
+          <div class="icon">🗂️</div>
+          <div>タイトルを入力して追加しましょう</div>
+        </div>
+      </div>
+
+      <div id="action-area">
+        <button class="btn-export" onclick="exportCSV()">📥 CSVで書き出す</button>
+        <button class="btn-clear" onclick="clearAll()">すべて削除する</button>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    let items = [];
+
+    // 追加ボタン
+    function addItem() {
+      const titleInput  = document.getElementById('title-input');
+      const circleInput = document.getElementById('circle-input');
+      const qtyInput    = document.getElementById('qty-input');
+      const errorTitle  = document.getElementById('error-title');
+
+      const title  = titleInput.value.trim();
+      const circle = circleInput.value.trim();
+      const qty    = Math.max(1, parseInt(qtyInput.value) || 1);
+
+      if (!title) {
+        errorTitle.style.display = 'block';
+        titleInput.focus();
+        return;
+      }
+      errorTitle.style.display = 'none';
+
+      items.push({
+        title,
+        circle,
+        qty,
+        addedAt: new Date().toLocaleString('ja-JP')
+      });
+
+      // 入力欄をリセット（タイトルのみ消す・サークル名は残す）
+      titleInput.value = '';
+      qtyInput.value   = '1';
+      titleInput.focus();
+
+      renderList();
+    }
+
+    // リスト描画
+    function renderList() {
+      const listEl     = document.getElementById('item-list');
+      const emptyEl    = document.getElementById('empty-state');
+      const countEl    = document.getElementById('item-count');
+      const actionArea = document.getElementById('action-area');
+
+      countEl.textContent = `${items.length}件`;
+
+      if (items.length === 0) {
+        emptyEl.style.display  = 'block';
+        actionArea.style.display = 'none';
+        document.querySelectorAll('.item-row').forEach(r => r.remove());
+        return;
+      }
+
+      emptyEl.style.display    = 'none';
+      actionArea.style.display = 'block';
+
+      document.querySelectorAll('.item-row').forEach(r => r.remove());
+
+      // 新しい順（逆順）で表示
+      [...items].reverse().forEach((item, revIdx) => {
+        const origIdx = items.length - 1 - revIdx;
+        const row = document.createElement('div');
+        row.className = 'item-row';
+        row.innerHTML = `
+          <span class="item-index">#${origIdx + 1}</span>
+          <div class="item-text">
+            <div class="item-title">${escapeHtml(item.title)}</div>
+            ${item.circle ? `<div class="item-circle">${escapeHtml(item.circle)}</div>` : ''}
+          </div>
+          <span class="item-qty">×${item.qty}</span>
+          <button class="btn-delete" onclick="deleteItem(${origIdx})" title="削除">✕</button>
+        `;
+        listEl.appendChild(row);
+      });
+    }
+
+    // 削除
+    function deleteItem(index) {
+      items.splice(index, 1);
+      renderList();
+    }
+
+    // 全件削除
+    function clearAll() {
+      if (!confirm(`${items.length}件すべて削除しますか？`)) return;
+      items = [];
+      renderList();
+    }
+
+    // CSV書き出し
+    function exportCSV() {
+      if (items.length === 0) return;
+
+      const header = 'No.,タイトル,サークル名,個数,追加日時';
+      const rows   = items.map((item, i) => {
+        // カンマや改行を含む可能性があるのでダブルクォートで囲む
+        const title  = `"${item.title.replace(/"/g, '""')}"`;
+        const circle = `"${item.circle.replace(/"/g, '""')}"`;
+        return `${i + 1},${title},${circle},${item.qty},"${item.addedAt}"`;
+      });
+
+      const csvContent = [header, ...rows].join('\n');
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const today = new Date().toISOString().slice(0, 10);
+      link.href     = url;
+      link.download = `同人誌リスト_${today}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // HTMLエスケープ
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;');
+    }
+
+    // Enterキーで追加
+    document.getElementById('title-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); addItem(); }
+    });
+    document.getElementById('circle-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('qty-input').focus(); }
+    });
+    document.getElementById('qty-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); addItem(); }
+    });
+  </script>
+</body>
+</html>
