@@ -397,6 +397,23 @@
       white-space: pre-line; /* \n で改行できるように */
     }
 
+    /* ライト（トーチ）ボタン */
+    .btn-torch {
+      display: none; /* 対応端末でのみJavaScriptがblockに変える */
+      margin-top: 14px;
+      padding: 10px 28px;
+      background: rgba(255, 255, 255, 0.12);
+      color: white;
+      border: 1.5px solid rgba(255, 255, 255, 0.3);
+      border-radius: 10px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .btn-torch:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
     /* キャンセルボタン */
     .btn-cancel-camera {
       margin-top: 22px;
@@ -492,8 +509,11 @@
     <!-- html5-qrcodeライブラリがここにカメラ映像を描画する -->
     <div id="reader"></div>
 
-    <div class="overlay-hint">バーコードを枠の中に合わせてください</div>
+    <div class="overlay-hint">15〜20cm 離して、枠の中に横向きで合わせてください</div>
     <div id="camera-status"></div>
+
+    <!-- ライトボタン（対応端末でのみ表示される） -->
+    <button class="btn-torch" id="btn-torch" onclick="toggleTorch()">🔦 ライトをつける</button>
 
     <button class="btn-cancel-camera" onclick="closeCamera()">キャンセル</button>
   </div>
@@ -521,11 +541,52 @@
       // "reader" = カメラ映像を表示するdivのid
       html5QrCode = new Html5Qrcode("reader");
 
-      // スキャン設定
+      // スキャン枠のサイズを画面幅に合わせて計算する
+      // 枠が大きいほどバーコードを雑に合わせても読める
+      const viewWidth  = Math.min(window.innerWidth - 56, 320);
+      const boxWidth   = Math.floor(viewWidth * 0.92);
+      const boxHeight  = Math.floor(boxWidth * 0.55); // バーコードは横長なので高さは控えめ
+
+      // スキャン設定（読み取り精度を上げるためのチューニング）
       const scanConfig = {
-        fps: 10,                      // 1秒間に10回スキャンを試みる
-        qrbox: { width: 240, height: 100 }, // スキャン枠のサイズ（バーコードは横長）
-        aspectRatio: 1.3333,          // カメラ映像の縦横比（4:3）
+
+        // 1秒間に何回スキャンを試みるか
+        // 10 → 24 に増やし、手ブレ中でも読み取るチャンスを増やす
+        fps: 24,
+
+        // スキャン枠のサイズ（画面幅に応じて自動計算）
+        qrbox: { width: boxWidth, height: boxHeight },
+
+        // ★ 最重要: カメラ映像の品質指定
+        // 指定しないとブラウザが低解像度（640×480程度）を選び、
+        // JANコードの細い線が潰れて読めなくなる
+        videoConstraints: {
+          facingMode: "environment",        // 背面カメラ
+          width:  { ideal: 1920 },          // 横1920px（フルHD）を希望
+          height: { ideal: 1080 },          // 縦1080px
+          // continuous = 連続オートフォーカス
+          // 一度ピントを合わせて固定するのではなく、常に合わせ続ける
+          advanced: [{ focusMode: "continuous" }]
+        },
+
+        // ★ 読み取る形式をJANコード系だけに限定する
+        // 全形式（QRコード等）を毎回照合していた分の処理時間が浮き、
+        // 1秒あたりの実質的な判定回数が増える
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,   // JANコード13桁（日本の標準）
+          Html5QrcodeSupportedFormats.EAN_8,    // JANコード8桁（短縮版）
+          Html5QrcodeSupportedFormats.UPC_A,    // 米国規格（海外商品）
+          Html5QrcodeSupportedFormats.UPC_E,    // 米国規格の短縮版
+          Html5QrcodeSupportedFormats.CODE_128, // 一部の書籍・同人誌で使用
+          Html5QrcodeSupportedFormats.ITF       // 段ボール等の集合包装用
+        ],
+
+        // 端末がネイティブのバーコード検出機能を持つ場合はそちらを使う
+        // （Androidで有効。iOSでは無視されるが害はない）
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+
+        // 鏡像（左右反転）のチェックを省く → 1回あたりの処理が軽くなる
+        disableFlip: true
       };
 
       html5QrCode.start(
@@ -537,7 +598,10 @@
           // 読み取った番号をバーコード入力欄にセット
           document.getElementById('barcode-input').value = decodedText;
           document.getElementById('error-barcode').style.display = 'none';
-          document.getElementById('camera-status').textContent = '✅ 読み取りました！';
+          document.getElementById('camera-status').textContent = '✅ ' + decodedText;
+
+          // 端末を短く振動させて成功を知らせる（対応端末のみ）
+          if (navigator.vibrate) navigator.vibrate(60);
 
           // 0.7秒後にカメラを閉じて個数入力欄にカーソルを移す
           setTimeout(function() {
@@ -555,12 +619,55 @@
         // 起動成功
         document.getElementById('camera-status').textContent = 'バーコードを探しています...';
 
+        // ライト（トーチ）に対応している端末ならボタンを表示する
+        setupTorchButton();
+
       }).catch(function(err) {
         // カメラの起動に失敗（権限拒否・ハードウェアエラーなど）
         document.getElementById('camera-status').textContent =
           '⚠️ カメラを起動できませんでした。\nSafariの設定でカメラを許可してください。';
         console.error('カメラエラー:', err);
       });
+    }
+
+    // -----------------------------------------------
+    // ライト（トーチ）ボタンの準備
+    // 暗い場所での読み取り精度を上げるための機能
+    // 対応していない端末ではボタン自体を表示しない
+    // -----------------------------------------------
+    let torchOn = false;
+
+    function setupTorchButton() {
+      const btn = document.getElementById('btn-torch');
+      torchOn = false;
+      btn.textContent = '🔦 ライトをつける';
+
+      try {
+        // カメラが持つ機能一覧を取得
+        const caps  = html5QrCode.getRunningTrackCameraCapabilities();
+        const torch = caps.torchFeature();
+
+        // ライト非対応ならボタンを隠して終了
+        if (!torch.isSupported()) { btn.style.display = 'none'; return; }
+
+        btn.style.display = 'block';
+      } catch (e) {
+        // 取得に失敗した場合もボタンを隠す
+        btn.style.display = 'none';
+      }
+    }
+
+    // ライトのオン・オフを切り替える
+    async function toggleTorch() {
+      const btn = document.getElementById('btn-torch');
+      try {
+        const torch = html5QrCode.getRunningTrackCameraCapabilities().torchFeature();
+        torchOn = !torchOn;
+        await torch.apply(torchOn);
+        btn.textContent = torchOn ? '🔦 ライトを消す' : '🔦 ライトをつける';
+      } catch (e) {
+        btn.style.display = 'none';
+      }
     }
 
     // -----------------------------------------------
@@ -572,6 +679,8 @@
         // .then() の中でオーバーレイを非表示にする
         html5QrCode.stop().then(function() {
           html5QrCode = null;
+          torchOn = false;
+          document.getElementById('btn-torch').style.display = 'none';
           document.getElementById('camera-overlay').style.display = 'none';
           document.getElementById('camera-status').textContent = '';
         }).catch(function() {
